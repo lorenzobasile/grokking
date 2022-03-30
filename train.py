@@ -2,6 +2,8 @@ import math
 from argparse import ArgumentParser
 from itertools import permutations
 
+import operations
+
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import torch
@@ -67,7 +69,7 @@ class Decoder(nn.Module):
         return logits
 
 
-def division_mod_p_data(p, eq_token, op_token):
+def generate_data(p, eq_token, op_token, operation):
     """
     x◦y = x/y (mod p) for 0 ≤ x < p, 0 < y < p
     """
@@ -77,7 +79,7 @@ def division_mod_p_data(p, eq_token, op_token):
 
     eq = torch.ones_like(x) * eq_token
     op = torch.ones_like(x) * op_token
-    result = x * y % p
+    result = operation(x,y) % p
 
     # "All of our experiments used a small transformer trained on datasets of
     # equations of the form a◦b = c, where each of “a”, “◦”, “b”, “=”, and “c”
@@ -106,7 +108,7 @@ def main(args):
 
     # "We train on the binary operation of division mod 97 with 50% of the data
     # in the training set."
-    data = division_mod_p_data(args.p, eq_token, op_token)
+    data = generate_data(args.p, eq_token, op_token, operations.ops[args.operation])
     train_idx, valid_idx = torch.randperm(data.shape[1]).split(data.shape[1] // 2)
     train_data, valid_data = data[:, train_idx], data[:, valid_idx]
 
@@ -188,6 +190,9 @@ def main(args):
             plt.savefig("figures/loss.png", dpi=150)
             plt.close()
 
+        if (e+1) in [1e1, 1e2, 1e3, 1e4, 1e5]:
+            torch.save(model.state_dict, f'weights/weights{e+1}.pt')
+
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -199,5 +204,6 @@ if __name__ == "__main__":
     parser.add_argument("--beta2", type=float, default=0.98)
     parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--optimizer", default="Adam")
+    parser.add_argument("--operation", default="mul")
     args = parser.parse_args()
     main(args)
