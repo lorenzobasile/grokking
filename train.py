@@ -9,7 +9,7 @@ from tqdm import tqdm
 import torch
 from torch import nn
 import torch.nn.functional as F
-
+import os
 
 class Block(nn.Module):
     """
@@ -89,6 +89,9 @@ def generate_data(p, eq_token, op_token, operation):
 
 def main(args):
     torch.manual_seed(0)
+    
+    if not os.path.exists(f'weights/{args.operation}'):
+        os.makedirs(f'weights/{args.operation}')
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -191,7 +194,7 @@ def main(args):
             plt.close()
 
         if (e+1) in [1e1, 1e2, 1e3, 1e4, 1e5]:
-            torch.save(model.state_dict, f'weights/weights{e+1}.pt')
+            torch.save(model.state_dict, f'weights/{args.operation}/weights{e+1}.pt')
 
 
 if __name__ == "__main__":
