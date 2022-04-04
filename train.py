@@ -92,6 +92,8 @@ def main(args):
     
     if not os.path.exists(f'weights/{args.operation}'):
         os.makedirs(f'weights/{args.operation}')
+    if not os.path.exists(f'figures/{args.operation}'):
+        os.makedirs(f'figures/{args.operation}')
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -180,7 +182,7 @@ def main(args):
             plt.xlabel("Optimization Steps")
             plt.ylabel("Accuracy")
             plt.xscale("log", base=10)
-            plt.savefig("figures/acc.png", dpi=150)
+            plt.savefig(f'figures/{args.operation}/acc.png', dpi=150)
             plt.close()
 
             plt.plot(steps, train_loss, label="train")
@@ -190,7 +192,7 @@ def main(args):
             plt.xlabel("Optimization Steps")
             plt.ylabel("Loss")
             plt.xscale("log", base=10)
-            plt.savefig("figures/loss.png", dpi=150)
+            plt.savefig(f'figures/{args.operation}/loss.png', dpi=150)
             plt.close()
 
         if (e+1) in [1e1, 1e2, 1e3, 1e4, 1e5]:
