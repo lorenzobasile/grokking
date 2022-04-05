@@ -48,8 +48,17 @@ class Decoder(nn.Module):
         self.ln_f = nn.LayerNorm(dim)
         self.head = nn.Linear(dim, num_tokens, bias=False)
 
+    def extract_representation(self, x):
+        h = self.token_embeddings(x)
+        positions = torch.arange(x.shape[0], device=x.device).unsqueeze(-1)
+        h = h + self.position_embeddings(positions).expand_as(h)
+        for layer in self.layers:
+            h = layer(h)
+
+        return self.ln_f(h)
+        
     def forward(self, x):
-        return self.head(extract_representation(x))
+        return self.head(self.extract_representation(x))
         '''
         h = self.token_embeddings(x)
         positions = torch.arange(x.shape[0], device=x.device).unsqueeze(-1)
@@ -62,11 +71,4 @@ class Decoder(nn.Module):
         return logits
         '''
 
-    def extract_representation(self, x):
-        h = self.token_embeddings(x)
-        positions = torch.arange(x.shape[0], device=x.device).unsqueeze(-1)
-        h = h + self.position_embeddings(positions).expand_as(h)
-        for layer in self.layers:
-            h = layer(h)
 
-        return self.ln_f(h)
