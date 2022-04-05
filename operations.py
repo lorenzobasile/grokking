@@ -20,6 +20,8 @@ def x3(x,y):
 def y3(x,y):
     return y*y*y
     
-ops={"xy": multiplication, "x+y": addition, "x/y": division, "x":x1, "y":y1}
+ops={"xy": multiplication, "x+y": addition, 
+    "xDIVy": division, "x":x1, "y":y1,
+    "x^2": x2, "y^2": y2, "x^3": x3, "y^3": y3}
 
 

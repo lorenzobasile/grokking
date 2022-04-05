@@ -178,7 +178,7 @@ def main(args):
             plt.plot(steps, train_acc, label="train")
             plt.plot(steps, val_acc, label="val")
             plt.legend()
-            plt.title("Modular Division (training on 50% of data)")
+            plt.title(f'{args.operation}(training on 50% of data)')
             plt.xlabel("Optimization Steps")
             plt.ylabel("Accuracy")
             plt.xscale("log", base=10)
@@ -188,7 +188,7 @@ def main(args):
             plt.plot(steps, train_loss, label="train")
             plt.plot(steps, val_loss, label="val")
             plt.legend()
-            plt.title("Modular Division (training on 50% of data)")
+            plt.title(f'{args.operation}(training on 50% of data)')
             plt.xlabel("Optimization Steps")
             plt.ylabel("Loss")
             plt.xscale("log", base=10)
@@ -197,6 +197,7 @@ def main(args):
 
         if (e+1) in [1e1, 1e2, 1e3, 1e4, 1e5]:
             torch.save(model.state_dict, f'weights/{args.operation}/weights{e+1}.pt')
+    torch.save(model.state_dict, f'weights/{args.operation}/final.pt')
 
 
 if __name__ == "__main__":
