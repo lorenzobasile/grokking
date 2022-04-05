@@ -7,6 +7,7 @@ import operations
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import torch
+from torch import nn
 import torch.nn.functional as F
 import os
 
