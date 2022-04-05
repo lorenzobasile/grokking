@@ -33,6 +33,7 @@ def generate_data(p, eq_token, op_token, operation):
 
 def main(args):
     torch.manual_seed(0)
+    ops={**operations.monomial, **operations.composite}
 
     if not os.path.exists(f'weights/{args.operation}'):
         os.makedirs(f'weights/{args.operation}')
@@ -57,7 +58,7 @@ def main(args):
 
     # "We train on the binary operation of division mod 97 with 50% of the data
     # in the training set."
-    data = generate_data(args.p, eq_token, op_token, operations.ops[args.operation])
+    data = generate_data(args.p, eq_token, op_token, ops[args.operation])
     train_idx, valid_idx = torch.randperm(data.shape[1]).split(data.shape[1] // 2)
     train_data, valid_data = data[:, train_idx], data[:, valid_idx]
 
