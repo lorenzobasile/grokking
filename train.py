@@ -7,89 +7,16 @@ import operations
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import torch
-from torch import nn
 import torch.nn.functional as F
 import os
 
-class Block(nn.Module):
-    """
-    Causal transformer block
-    """
+from models import Decoder
 
-    def __init__(self, dim, num_heads):
-        super().__init__()
-        self.ln_1 = nn.LayerNorm(dim)
-        self.ln_2 = nn.LayerNorm(dim)
-        self.attn = nn.MultiheadAttention(dim, num_heads)
-        self.mlp = nn.Sequential(
-            nn.Linear(dim, dim * 4),
-            nn.GELU(),
-            nn.Linear(dim * 4, dim),
-        )
-
-    def forward(self, x):
-        attn_mask = torch.full(
-            (len(x), len(x)), -float("Inf"), device=x.device, dtype=x.dtype
-        )
-        attn_mask = torch.triu(attn_mask, diagonal=1)
-
-        x = self.ln_1(x)
-        a, _ = self.attn(x, x, x, attn_mask=attn_mask, need_weights=False)
-        x = x + a
-        m = self.mlp(self.ln_2(x))
-        x = x + m
-        return x
-
-
-class Decoder(nn.Module):
-    """
-    Causal Transformer decoder
-    """
-
-    def __init__(self, dim=128, num_layers=2, num_heads=4, num_tokens=97, seq_len=5):
-        super().__init__()
-        self.token_embeddings = nn.Embedding(num_tokens, dim)
-        self.position_embeddings = nn.Embedding(seq_len, dim)
-        self.layers = nn.ModuleList()
-        for _ in range(num_layers):
-            self.layers.append(Block(dim, num_heads))
-
-        self.ln_f = nn.LayerNorm(dim)
-        self.head = nn.Linear(dim, num_tokens, bias=False)
-
-    def forward(self, x):
-        h = self.token_embeddings(x)
-        positions = torch.arange(x.shape[0], device=x.device).unsqueeze(-1)
-        h = h + self.position_embeddings(positions).expand_as(h)
-        for layer in self.layers:
-            h = layer(h)
-
-        h = self.ln_f(h)
-        logits = self.head(h)
-        return logits
-
-
-def generate_data(p, eq_token, op_token, operation):
-    """
-    x◦y = x/y (mod p) for 0 ≤ x < p, 0 < y < p
-    """
-    x = torch.arange(p)
-    y = torch.arange(1, p)
-    x, y = torch.cartesian_prod(x, y).T
-
-    eq = torch.ones_like(x) * eq_token
-    op = torch.ones_like(x) * op_token
-    result = operation(x,y) % p
-
-    # "All of our experiments used a small transformer trained on datasets of
-    # equations of the form a◦b = c, where each of “a”, “◦”, “b”, “=”, and “c”
-    # is a seperate token"
-    return torch.stack([x, op, y, eq, result])
 
 
 def main(args):
     torch.manual_seed(0)
-    
+
     if not os.path.exists(f'weights/{args.operation}'):
         os.makedirs(f'weights/{args.operation}')
     if not os.path.exists(f'figures/{args.operation}'):
@@ -113,7 +40,7 @@ def main(args):
 
     # "We train on the binary operation of division mod 97 with 50% of the data
     # in the training set."
-    data = generate_data(args.p, eq_token, op_token, operations.ops[args.operation])
+    data = operations.generate_data(args.p, eq_token, op_token, operations.ops[args.operation])
     train_idx, valid_idx = torch.randperm(data.shape[1]).split(data.shape[1] // 2)
     train_data, valid_data = data[:, train_idx], data[:, valid_idx]
 
