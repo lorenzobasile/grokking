@@ -32,7 +32,7 @@ def generate_data(p, eq_token, op_token, operation):
 
 
 def main(args):
-    torch.manual_seed(0)
+    torch.manual_seed(1)
     ops={**operations.monomial, **operations.composite}
 
     if not os.path.exists(f'weights/{args.operation}'):
@@ -70,7 +70,9 @@ def main(args):
         weight_decay=args.weight_decay,
         betas=(args.beta1, args.beta2),
     )
-
+    '''
+    optimizer=torch.optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    '''
     #  linear learning rate warmup over the first 10 updates
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer, lambda update: 1 if update > 10 else update / 10
@@ -79,13 +81,13 @@ def main(args):
     steps_per_epoch = math.ceil(train_data.shape[1] / args.batch_size)
 
     train_acc, val_acc, train_loss, val_loss = [], [], [], []
-
+    exp=0
     for e in tqdm(range(int(args.budget) // steps_per_epoch)):
 
         # randomly shuffle train data
         train_data = train_data[:, torch.randperm(train_data.shape[1])]
 
-        for data, is_train in [(train_data, True), (valid_data, False)]:
+        for data, is_train in [(valid_data, False), (train_data, True)]:
 
             model.train(is_train)
             total_loss = 0
@@ -109,12 +111,15 @@ def main(args):
                     scheduler.step()
 
                 acc = (logits[-1].argmax(-1) == input[-1]).float().mean()
+
                 total_acc += acc.item() * input.shape[-1]
 
             if is_train:
+                #print("Train ", total_acc)
                 train_acc.append(total_acc / train_data.shape[-1])
                 train_loss.append(total_loss / train_data.shape[-1])
-            else:
+            else:                
+                #print("Test ", total_acc)
                 val_acc.append(total_acc / valid_data.shape[-1])
                 val_loss.append(total_loss / valid_data.shape[-1])
 
@@ -140,9 +145,10 @@ def main(args):
             plt.savefig(f'figures/{args.operation}/loss.png', dpi=150)
             plt.close()
 
-        if (e+1) in [1e1, 1e2, 1e3, 1e4, 1e5]:
-            torch.save(model.state_dict, f'weights/{args.operation}/weights{e+1}.pt')
-    torch.save(model.state_dict, f'weights/{args.operation}/final.pt')
+        if (e+1)*steps_per_epoch > 10**exp:
+            torch.save(model.state_dict(), f'weights/{args.operation}/weights{10**exp}.pt')
+            exp+=1
+    torch.save(model.state_dict(), f'weights/{args.operation}/final.pt')
 
 
 if __name__ == "__main__":
