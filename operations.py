@@ -20,5 +20,12 @@ def x3(x,y):
 def y3(x,y):
     return y*y*y
 
+def x2y(x,y):
+    return x*x*y
+def xy2(x,y):
+    return x*y*y
+
+other={"x^2y":x2y, "xy^2": xy2}
 monomial={"x":x1,"y":y1,"x^2": x2, "y^2": y2, "x^3": x3, "y^3": y3}
 composite={"xy": multiplication, "x+y": addition, "xDIVy": division}
+

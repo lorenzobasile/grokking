@@ -33,7 +33,7 @@ def generate_data(p, eq_token, op_token, operation):
 
 def main(args):
     torch.manual_seed(1)
-    ops={**operations.monomial, **operations.composite}
+    ops={**operations.monomial, **operations.composite, **operations.other}
 
     if not os.path.exists(f'weights/{args.operation}'):
         os.makedirs(f'weights/{args.operation}')
