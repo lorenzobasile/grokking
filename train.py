@@ -32,7 +32,7 @@ def generate_data(p, eq_token, op_token, operation):
 
 
 def main(args):
-    torch.manual_seed(1)
+    torch.manual_seed(0)
     ops={**operations.monomial, **operations.composite, **operations.other}
 
     if not os.path.exists(f'weights/{args.operation}'):
@@ -64,6 +64,7 @@ def main(args):
 
     # For most experiments we used AdamW optimizer with learning rate 10−3,
     # weight decay 1, β1 = 0.9, β2 = 0.98
+
     optimizer = getattr(torch.optim, args.optimizer)(
         model.parameters(),
         lr=args.lr,
@@ -71,7 +72,7 @@ def main(args):
         betas=(args.beta1, args.beta2),
     )
     '''
-    optimizer=torch.optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optimizer=torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     '''
     #  linear learning rate warmup over the first 10 updates
     scheduler = torch.optim.lr_scheduler.LambdaLR(
@@ -154,7 +155,7 @@ def main(args):
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--p", type=int, default=97)
-    parser.add_argument("--budget", type=int, default=3e5)
+    parser.add_argument("--budget", type=int, default=3e6)
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--beta1", type=float, default=0.9)
