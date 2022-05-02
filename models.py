@@ -1,6 +1,14 @@
 import torch
 from torch import nn
 
+class OneLayer(nn.Module):
+
+    def __init__(self, dim):
+        super().__init__()
+        self.layer = nn.Linear(dim, 97)
+
+    def forward(self, x):
+        return self.layer(x)
 
 class Block(nn.Module):
     """
@@ -56,7 +64,7 @@ class Decoder(nn.Module):
             h = layer(h)
 
         return self.ln_f(h)
-        
+
     def forward(self, x):
         return self.head(self.extract_representation(x))
         '''
@@ -70,5 +78,3 @@ class Decoder(nn.Module):
         logits = self.head(h)
         return logits
         '''
-
-
