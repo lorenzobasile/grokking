@@ -16,7 +16,7 @@ head=OneLayer(128).to(device)
 optimizer=torch.optim.Adam(head.parameters(), 0.1)
 eq_token = 97
 op_token = 97 + 1
-data = generate_data(97, eq_token, op_token, monomial['x^2']).to(device)
+data = generate_data(97, eq_token, op_token, composite['xy']).to(device)
 accuracies=[]
 for e in range(500):
     out=head(representations['x'])
@@ -28,11 +28,11 @@ for e in range(500):
     accuracies.append(acc.item())
     print(acc)
 plt.plot(range(500), accuracies, label="train")
-plt.title(f'Linear regression from x representation to x^2')
+plt.title(f'Linear regression from x representation to xy')
 plt.xlabel("Optimization Steps")
 plt.ylabel("Accuracy")
 #plt.xscale("log", base=10)
-plt.savefig(f'figures/x2fromx.png', dpi=150)
+plt.savefig(f'figures/xyfromx.png', dpi=150)
 plt.close()
 '''
 out=head(representations['x'])
