@@ -4,6 +4,9 @@ from itertools import permutations
 
 import operations
 
+from sklearn import linear_model
+from sklearn.metrics import r2_score
+
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import torch
@@ -34,6 +37,11 @@ def generate_data(p, eq_token, op_token, operation):
 def main(args):
     torch.manual_seed(0)
     ops={**operations.monomial, **operations.composite, **operations.other}
+    score={}
+    for key, value in ops.items():
+        score[key]=[]
+        representations[key]=torch.load(f'representations/{key}/final.pt')
+        representationsNew[key]=torch.load(f'representationsNew/{key}/final.pt')
 
     if not os.path.exists(f'weights/{args.operation}'):
         os.makedirs(f'weights/{args.operation}')
@@ -119,10 +127,16 @@ def main(args):
                 #print("Train ", total_acc)
                 train_acc.append(total_acc / train_data.shape[-1])
                 train_loss.append(total_loss / train_data.shape[-1])
-            else:                
+            else:
                 #print("Test ", total_acc)
                 val_acc.append(total_acc / valid_data.shape[-1])
                 val_loss.append(total_loss / valid_data.shape[-1])
+                for key, value in ops.items():
+                    lm = linear_model.LinearRegression()
+                    x=representations[key].cpu().numpy()
+                    y=model.extract_representation(input[:-1])[-1].cpu().numpy()
+                    lm.fit(x, y)
+                    score[key].append(r2_score(lm.predict(x), y, multioutput='variance_weighted'))
 
         if (e + 1) % 100 == 0:
             steps = torch.arange(len(train_acc)).numpy() * steps_per_epoch
@@ -145,6 +159,20 @@ def main(args):
             plt.xscale("log", base=10)
             plt.savefig(f'figures/{args.operation}/loss.png', dpi=150)
             plt.close()
+
+            plt.figure()
+            for key, value in ops.items():
+                plt.plot(steps, score[key], label=key)
+            plt.legend()
+            plt.title(f'R2 score')
+            plt.xlabel("Optimization Steps")
+            plt.ylabel("R2")
+            plt.xscale("log", base=10)
+            plt.savefig(f'figures/{args.operation}/r2.png', dpi=150)
+            plt.close()
+
+
+
 
         if (e+1)*steps_per_epoch > 10**exp:
             torch.save(model.state_dict(), f'weights/{args.operation}/weights{10**exp}.pt')
