@@ -38,10 +38,11 @@ def main(args):
     torch.manual_seed(0)
     ops={**operations.monomial, **operations.composite, **operations.other}
     score={}
+    representations={}
+    ops1={'x', 'y', 'x^2', 'x+y', 'xy'}
     for key, value in ops.items():
         score[key]=[]
         representations[key]=torch.load(f'representations/{key}/final.pt')
-        representationsNew[key]=torch.load(f'representationsNew/{key}/final.pt')
 
     if not os.path.exists(f'weights/{args.operation}'):
         os.makedirs(f'weights/{args.operation}')
@@ -66,9 +67,9 @@ def main(args):
 
     # "We train on the binary operation of division mod 97 with 50% of the data
     # in the training set."
-    data = generate_data(args.p, eq_token, op_token, ops[args.operation])
-    train_idx, valid_idx = torch.randperm(data.shape[1]).split(data.shape[1] // 2)
-    train_data, valid_data = data[:, train_idx], data[:, valid_idx]
+    alldata = generate_data(args.p, eq_token, op_token, ops[args.operation])
+    train_idx, valid_idx = torch.randperm(alldata.shape[1]).split(alldata.shape[1] // 2)
+    train_data, valid_data = alldata[:, train_idx], alldata[:, valid_idx]
 
     # For most experiments we used AdamW optimizer with learning rate 10−3,
     # weight decay 1, β1 = 0.9, β2 = 0.98
@@ -131,12 +132,13 @@ def main(args):
                 #print("Test ", total_acc)
                 val_acc.append(total_acc / valid_data.shape[-1])
                 val_loss.append(total_loss / valid_data.shape[-1])
-                for key, value in ops.items():
-                    lm = linear_model.LinearRegression()
-                    x=representations[key].cpu().numpy()
-                    y=model.extract_representation(input[:-1])[-1].cpu().numpy()
-                    lm.fit(x, y)
-                    score[key].append(r2_score(lm.predict(x), y, multioutput='variance_weighted'))
+                with torch.no_grad():
+                    for key, value in ops.items():
+                        lm = linear_model.LinearRegression()
+                        x=representations[key].cpu().numpy()
+                        y=model.extract_representation(alldata.to(device)[:-1])[-1].cpu().numpy()
+                        lm.fit(x, y)
+                        score[key].append(r2_score(lm.predict(x), y, multioutput='variance_weighted'))
 
         if (e + 1) % 100 == 0:
             steps = torch.arange(len(train_acc)).numpy() * steps_per_epoch
@@ -183,7 +185,7 @@ def main(args):
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--p", type=int, default=97)
-    parser.add_argument("--budget", type=int, default=3e6)
+    parser.add_argument("--budget", type=int, default=3e5)
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--beta1", type=float, default=0.9)
