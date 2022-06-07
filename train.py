@@ -137,6 +137,8 @@ def main(args):
                         lm = linear_model.LinearRegression()
                         x=representations[key].cpu().numpy()
                         y=model.extract_representation(alldata.to(device)[:-1])[-1].cpu().numpy()
+                        x=svd_reduction(x).T
+                        y=svd_reduction(y).T
                         lm.fit(x, y)
                         score[key].append(r2_score(lm.predict(x), y, multioutput='variance_weighted'))
 
