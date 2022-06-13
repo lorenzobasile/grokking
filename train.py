@@ -38,14 +38,16 @@ def generate_data(p, eq_token, op_token, operation):
 
 
 def main(args):
-    torch.manual_seed(0)
+    #torch.manual_seed(0)
     ops={**operations.monomial, **operations.composite, **operations.other}
     score={}
     representations={}
     ops1={'x', 'y', 'x^2', 'x+y', 'xy'}
+    '''
     for key, value in ops.items():
         score[key]=[]
         representations[key]=torch.load(f'representations/{key}/final.pt')
+    '''
     if not os.path.exists(f'weights/{args.operation}'):
         os.makedirs(f'weights/{args.operation}')
     if not os.path.exists(f'figures/{args.operation}'):
@@ -134,10 +136,10 @@ def main(args):
                 #print("Test ", total_acc)
                 val_acc.append(total_acc / valid_data.shape[-1])
                 val_loss.append(total_loss / valid_data.shape[-1])
-
+                '''
                 with torch.no_grad():
                     for key, value in ops.items():
-                        lm = linear_model.LinearRegression()
+                        #lm = linear_model.LinearRegression()
                         x=representations[key].cpu().numpy()
                         y=model.extract_representation(alldata.to(device)[:-1])[-1].cpu().numpy()
                         x=svd_reduction(x).T
@@ -146,7 +148,7 @@ def main(args):
                         score[key].append(svcca_results['cca_coef1'].mean())
                         #lm.fit(x, y)
                         #score[key].append(r2_score(lm.predict(x), y, multioutput='variance_weighted'))
-
+                '''
         if (e + 1) % 100 == 0:
             steps = torch.arange(len(train_acc)).numpy() * steps_per_epoch
             plt.plot(steps, train_acc, label="train")
@@ -156,7 +158,7 @@ def main(args):
             plt.xlabel("Optimization Steps")
             plt.ylabel("Accuracy")
             plt.xscale("log", base=10)
-            plt.savefig(f'figures/{args.operation}/acc2.png', dpi=150)
+            plt.savefig(f'figures/{args.operation}/acc.png', dpi=150)
             plt.close()
 
             plt.plot(steps, train_loss, label="train")
@@ -166,9 +168,9 @@ def main(args):
             plt.xlabel("Optimization Steps")
             plt.ylabel("Loss")
             plt.xscale("log", base=10)
-            plt.savefig(f'figures/{args.operation}/loss2.png', dpi=150)
+            plt.savefig(f'figures/{args.operation}/loss.png', dpi=150)
             plt.close()
-            
+
             plt.figure()
             for key, value in ops.items():
                 plt.plot(steps, score[key], label=key)
@@ -179,15 +181,17 @@ def main(args):
             plt.xscale("log", base=10)
             plt.savefig(f'figures/{args.operation}/cca_score.png', dpi=150)
             plt.close()
-            
+
 
 
 
 
         if (e+1)*steps_per_epoch > 10**exp:
-            torch.save(model.state_dict(), f'weights/{args.operation}/weights{10**exp}2.pt')
+            torch.save(model.state_dict(), f'weights/{args.operation}/weights{10**exp}.pt')
             exp+=1
-    torch.save(model.state_dict(), f'weights/{args.operation}/final2.pt')
+            repr=model.extract_representation(data[:-1])[-1]
+            torch.save(repr, f'representations/{args.operation}/{10**exp}.pt')
+    torch.save(model.state_dict(), f'weights/{args.operation}/final.pt')
 
 
 if __name__ == "__main__":

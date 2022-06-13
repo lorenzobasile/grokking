@@ -21,31 +21,33 @@ def svd_reduction(M):
 
     M_reduced = np.dot(U[:, :i], s[:i]*np.eye(i))
     return M_reduced
-
-with torch.no_grad():
-    operation_names=[]
-    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    representations={}
-    representationsNew={}
-    for key, value in {**other, **monomial, **composite}.items():
-        operation_names.append(key)
-        representations[key]=torch.load(f'representations/{key}/final.pt').cpu().numpy()
-    representations['random']=torch.load('old/representations/x^2/random.pt').cpu().numpy()
-    operation_names.append('random')
-    results=np.zeros((len(operation_names), len(operation_names)))
-    for i in range(len(operation_names)):
-        for j in range(len(operation_names)): 
-            x=representations[operation_names[i]]
-            y=representations[operation_names[j]]
-            x=svd_reduction(x).T
-            y=svd_reduction(y).T
-            svcca_results = get_cca_similarity(x, y, epsilon=1e-10, verbose=False)
-            results[i,j]=svcca_results['cca_coef1'].mean()
-    print(results)
-    hm=sns.heatmap(results, annot=True, cmap='Blues', fmt='.2f', xticklabels=operation_names, yticklabels=operation_names).set_title("SVCCA similarity score")
-    figure = hm.get_figure()
-    figure.savefig('figures/heatmap.png', dpi=400)
-    #lm = linear_model.LinearRegression()
-    #x=representations['x+y'].cpu().numpy()
-    #lm.fit(x_n, x)
-    #print(r2_score(lm.predict(x_n), x, multioutput='variance_weighted'))
+def main():
+    with torch.no_grad():
+        operation_names=[]
+        #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        representations={}
+        representationsNew={}
+        for key, value in {**other, **monomial, **composite}.items():
+            operation_names.append(key)
+            representations[key]=torch.load(f'representations/{key}/final.pt').cpu().numpy()
+        representations['random']=torch.load('old/representations/x^2/random.pt').cpu().numpy()
+        operation_names.append('random')
+        results=np.zeros((len(operation_names), len(operation_names)))
+        for i in range(len(operation_names)):
+            for j in range(len(operation_names)):
+                x=representations[operation_names[i]]
+                y=representations[operation_names[j]]
+                x=svd_reduction(x).T
+                y=svd_reduction(y).T
+                svcca_results = get_cca_similarity(x, y, epsilon=1e-10, verbose=False)
+                results[i,j]=svcca_results['cca_coef1'].mean()
+        print(results)
+        hm=sns.heatmap(results, annot=True, cmap='Blues', fmt='.2f', xticklabels=operation_names, yticklabels=operation_names).set_title("SVCCA similarity score")
+        figure = hm.get_figure()
+        figure.savefig('figures/heatmap.png', dpi=400)
+        #lm = linear_model.LinearRegression()
+        #x=representations['x+y'].cpu().numpy()
+        #lm.fit(x_n, x)
+        #print(r2_score(lm.predict(x_n), x, multioutput='variance_weighted'))
+if __name__ == "__main__":
+    main()
