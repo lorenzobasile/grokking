@@ -24,14 +24,14 @@ def svd_reduction(M):
 
 with torch.no_grad():
     operation_names=[]
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     representations={}
     representationsNew={}
     for key, value in {**other, **monomial, **composite}.items():
         operation_names.append(key)
         representations[key]=torch.load(f'representations/{key}/final.pt').cpu().numpy()
-        if key=='x^2':
-            representationsNew[key]=torch.load(f'representations/{key}/random.pt').cpu().numpy()
+    representations['random']=torch.load('old/representations/x^2/random.pt').cpu().numpy()
+    operation_names.append('random')
     results=np.zeros((len(operation_names), len(operation_names)))
     for i in range(len(operation_names)):
         for j in range(len(operation_names)): 

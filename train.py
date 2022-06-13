@@ -4,6 +4,9 @@ from itertools import permutations
 
 import operations
 
+from svcca.cca_core import get_cca_similarity
+from similarity import svd_reduction
+
 from sklearn import linear_model
 from sklearn.metrics import r2_score
 
@@ -43,7 +46,6 @@ def main(args):
     for key, value in ops.items():
         score[key]=[]
         representations[key]=torch.load(f'representations/{key}/final.pt')
-
     if not os.path.exists(f'weights/{args.operation}'):
         os.makedirs(f'weights/{args.operation}')
     if not os.path.exists(f'figures/{args.operation}'):
@@ -132,6 +134,7 @@ def main(args):
                 #print("Test ", total_acc)
                 val_acc.append(total_acc / valid_data.shape[-1])
                 val_loss.append(total_loss / valid_data.shape[-1])
+
                 with torch.no_grad():
                     for key, value in ops.items():
                         lm = linear_model.LinearRegression()
@@ -139,8 +142,10 @@ def main(args):
                         y=model.extract_representation(alldata.to(device)[:-1])[-1].cpu().numpy()
                         x=svd_reduction(x).T
                         y=svd_reduction(y).T
-                        lm.fit(x, y)
-                        score[key].append(r2_score(lm.predict(x), y, multioutput='variance_weighted'))
+                        svcca_results = get_cca_similarity(x, y, epsilon=1e-10, verbose=False)
+                        score[key].append(svcca_results['cca_coef1'].mean())
+                        #lm.fit(x, y)
+                        #score[key].append(r2_score(lm.predict(x), y, multioutput='variance_weighted'))
 
         if (e + 1) % 100 == 0:
             steps = torch.arange(len(train_acc)).numpy() * steps_per_epoch
@@ -151,7 +156,7 @@ def main(args):
             plt.xlabel("Optimization Steps")
             plt.ylabel("Accuracy")
             plt.xscale("log", base=10)
-            plt.savefig(f'figures/{args.operation}/acc.png', dpi=150)
+            plt.savefig(f'figures/{args.operation}/acc2.png', dpi=150)
             plt.close()
 
             plt.plot(steps, train_loss, label="train")
@@ -161,39 +166,40 @@ def main(args):
             plt.xlabel("Optimization Steps")
             plt.ylabel("Loss")
             plt.xscale("log", base=10)
-            plt.savefig(f'figures/{args.operation}/loss.png', dpi=150)
+            plt.savefig(f'figures/{args.operation}/loss2.png', dpi=150)
             plt.close()
-
+            
             plt.figure()
             for key, value in ops.items():
                 plt.plot(steps, score[key], label=key)
             plt.legend()
-            plt.title(f'R2 score')
+            plt.title(f'SVCCA score')
             plt.xlabel("Optimization Steps")
-            plt.ylabel("R2")
+            plt.ylabel("score")
             plt.xscale("log", base=10)
-            plt.savefig(f'figures/{args.operation}/r2.png', dpi=150)
+            plt.savefig(f'figures/{args.operation}/cca_score.png', dpi=150)
             plt.close()
+            
 
 
 
 
         if (e+1)*steps_per_epoch > 10**exp:
-            torch.save(model.state_dict(), f'weights/{args.operation}/weights{10**exp}.pt')
+            torch.save(model.state_dict(), f'weights/{args.operation}/weights{10**exp}2.pt')
             exp+=1
-    torch.save(model.state_dict(), f'weights/{args.operation}/final.pt')
+    torch.save(model.state_dict(), f'weights/{args.operation}/final2.pt')
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--p", type=int, default=97)
-    parser.add_argument("--budget", type=int, default=3e5)
+    parser.add_argument("--budget", type=int, default=5e5)
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--beta1", type=float, default=0.9)
     parser.add_argument("--beta2", type=float, default=0.98)
     parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--optimizer", default="Adam")
-    parser.add_argument("--operation", default="mul")
+    parser.add_argument("--operation", default="xy")
     args = parser.parse_args()
     main(args)
