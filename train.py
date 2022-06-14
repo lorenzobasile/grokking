@@ -168,9 +168,10 @@ def main(args):
             plt.xlabel("Optimization Steps")
             plt.ylabel("Loss")
             plt.xscale("log", base=10)
+            plt.yscale("log", base=10)
             plt.savefig(f'figures/{args.operation}/loss.png', dpi=150)
             plt.close()
-
+            '''
             plt.figure()
             for key, value in ops.items():
                 plt.plot(steps, score[key], label=key)
@@ -181,7 +182,7 @@ def main(args):
             plt.xscale("log", base=10)
             plt.savefig(f'figures/{args.operation}/cca_score.png', dpi=150)
             plt.close()
-
+            '''
 
 
 
@@ -189,9 +190,11 @@ def main(args):
         if (e+1)*steps_per_epoch > 10**exp:
             torch.save(model.state_dict(), f'weights/{args.operation}/weights{10**exp}.pt')
             exp+=1
-            repr=model.extract_representation(data[:-1])[-1]
+            repr=model.extract_representation(alldata.to(device)[:-1])[-1]
             torch.save(repr, f'representations/{args.operation}/{10**exp}.pt')
     torch.save(model.state_dict(), f'weights/{args.operation}/final.pt')
+    repr=model.extract_representation(alldata.to(device)[:-1])[-1]
+    torch.save(repr, f'representations/{args.operation}/final.pt')
 
 
 if __name__ == "__main__":
