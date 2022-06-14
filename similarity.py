@@ -1,11 +1,10 @@
 import torch
 from sklearn import linear_model
 from sklearn.metrics import r2_score
-from operations import monomial, other, composite
+from operations import monomial, other, composite, generate_data
 from svcca.cca_core import get_cca_similarity
 import seaborn as sns
 import numpy as np
-from train import generate_data
 
 torch.set_printoptions(threshold=10_000)
 np.set_printoptions(precision=2)
@@ -24,7 +23,7 @@ def svd_reduction(M):
 def main():
     with torch.no_grad():
         #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+
         for filename in ["10"]:#, "100", "1000", "10000", "100000", "final"]:
             operation_names=[]
             representations={}

@@ -19,23 +19,6 @@ import os
 
 from models import Decoder
 
-def generate_data(p, eq_token, op_token, operation):
-    """
-    x◦y = x/y (mod p) for 0 ≤ x < p, 0 < y < p
-    """
-    x = torch.arange(p)
-    y = torch.arange(1, p)
-    x, y = torch.cartesian_prod(x, y).T
-
-    eq = torch.ones_like(x) * eq_token
-    op = torch.ones_like(x) * op_token
-    result = operation(x,y) % p
-
-    # "All of our experiments used a small transformer trained on datasets of
-    # equations of the form a◦b = c, where each of “a”, “◦”, “b”, “=”, and “c”
-    # is a seperate token"
-    return torch.stack([x, op, y, eq, result])
-
 
 def main(args):
     #torch.manual_seed(0)
@@ -71,7 +54,7 @@ def main(args):
 
     # "We train on the binary operation of division mod 97 with 50% of the data
     # in the training set."
-    alldata = generate_data(args.p, eq_token, op_token, ops[args.operation])
+    alldata = operations.generate_data(args.p, eq_token, op_token, ops[args.operation])
     train_idx, valid_idx = torch.randperm(alldata.shape[1]).split(alldata.shape[1] // 2)
     train_data, valid_data = alldata[:, train_idx], alldata[:, valid_idx]
 
