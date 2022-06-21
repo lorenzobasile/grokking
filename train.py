@@ -25,7 +25,6 @@ def main(args):
     ops={**operations.monomial, **operations.composite, **operations.other}
     score={}
     representations={}
-    ops1={'x', 'y', 'x^2', 'x+y', 'xy'}
     '''
     for key, value in ops.items():
         score[key]=[]
@@ -35,6 +34,8 @@ def main(args):
         os.makedirs(f'weights/{args.operation}')
     if not os.path.exists(f'figures/{args.operation}'):
         os.makedirs(f'figures/{args.operation}')
+    if not os.path.exists(f'representations/{args.operation}'):
+        os.makedirs(f'representations/{args.operation}')
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -55,7 +56,7 @@ def main(args):
     # "We train on the binary operation of division mod 97 with 50% of the data
     # in the training set."
     alldata = operations.generate_data(args.p, eq_token, op_token, ops[args.operation])
-    train_idx, valid_idx = torch.randperm(alldata.shape[1]).split(alldata.shape[1] // 2)
+    train_idx, valid_idx = torch.randperm(alldata.shape[1]).split((alldata.shape[1] // 2)+1)
     train_data, valid_data = alldata[:, train_idx], alldata[:, valid_idx]
 
     # For most experiments we used AdamW optimizer with learning rate 10−3,
