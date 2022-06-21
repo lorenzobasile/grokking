@@ -25,6 +25,7 @@ def main(args):
     ops={**operations.monomial, **operations.composite, **operations.other}
     score={}
     representations={}
+    other_data={}
     '''
     for key, value in ops.items():
         score[key]=[]
@@ -56,6 +57,8 @@ def main(args):
     # "We train on the binary operation of division mod 97 with 50% of the data
     # in the training set."
     alldata = operations.generate_data(args.p, eq_token, op_token, ops[args.operation])
+    for key, value in ops.items():
+        other_data[key]=operations.generate_data(args.p, eq_token, op_token, value)
     train_idx, valid_idx = torch.randperm(alldata.shape[1]).split((alldata.shape[1] // 2)+1)
     train_data, valid_data = alldata[:, train_idx], alldata[:, valid_idx]
 
@@ -120,19 +123,22 @@ def main(args):
                 #print("Test ", total_acc)
                 val_acc.append(total_acc / valid_data.shape[-1])
                 val_loss.append(total_loss / valid_data.shape[-1])
-                '''
+
                 with torch.no_grad():
+                    x=model(alldata.to(device)[:-1])[-1].argmax(-1)
                     for key, value in ops.items():
-                        #lm = linear_model.LinearRegression()
-                        x=representations[key].cpu().numpy()
-                        y=model.extract_representation(alldata.to(device)[:-1])[-1].cpu().numpy()
-                        x=svd_reduction(x).T
-                        y=svd_reduction(y).T
-                        svcca_results = get_cca_similarity(x, y, epsilon=1e-10, verbose=False)
-                        score[key].append(svcca_results['cca_coef1'].mean())
-                        #lm.fit(x, y)
-                        #score[key].append(r2_score(lm.predict(x), y, multioutput='variance_weighted'))
-                '''
+
+                        #x=representations[key].cpu().numpy()
+                        #y=model.extract_representation(alldata.to(device)[:-1])[-1].cpu().numpy()
+                        #x=svd_reduction(x).T
+                        #y=svd_reduction(y).T
+                        #svcca_results = get_cca_similarity(x, y, epsilon=1e-10, verbose=False)
+                        #score[key].append(svcca_results['cca_coef1'].mean())
+
+                        y=model(other_data[key].to(device)[:-1])[-1].argmax(-1)
+                        score[key].append(torch.sum(torch.eq(x, y))/(args.p**2))
+
+
         if (e + 1) % 100 == 0:
             steps = torch.arange(len(train_acc)).numpy() * steps_per_epoch
             plt.plot(steps, train_acc, label="train")
@@ -155,18 +161,18 @@ def main(args):
             plt.yscale("log", base=10)
             plt.savefig(f'figures/{args.operation}/loss.png', dpi=150)
             plt.close()
-            '''
+
             plt.figure()
             for key, value in ops.items():
                 plt.plot(steps, score[key], label=key)
             plt.legend()
-            plt.title(f'SVCCA score')
+            plt.title(f'Overlap score')
             plt.xlabel("Optimization Steps")
             plt.ylabel("score")
             plt.xscale("log", base=10)
-            plt.savefig(f'figures/{args.operation}/cca_score.png', dpi=150)
+            plt.savefig(f'figures/{args.operation}/overlap_score.png', dpi=150)
             plt.close()
-            '''
+
 
 
 
