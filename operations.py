@@ -42,7 +42,7 @@ def generate_data(p, eq_token, op_token, operation):
     op = torch.ones_like(x) * op_token
     print(x.shape)
     if operation=="rand":
-        result=torch.randint(0, p, size=(p*p,))
+        result=torch.randint(0, p, size=(96*96,))
     else:
         result = operation(x,y) % p
 

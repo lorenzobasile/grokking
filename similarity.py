@@ -58,9 +58,9 @@ def main():
             for j in range(len(operation_names)-1):
                 xi=representations[operation_names[i]].float()
                 xj=representations[operation_names[j]].float()
-                results[i,j]=torch.sum(torch.eq(xi, xj))/(97**2)
+                results[i,j]=torch.sum(torch.eq(xi, xj))/(len(xi))
                 #results[i,j]=torch.dot(xi, xj)/torch.norm(xi, 2)/torch.norm(xj, 2)
-        hm=sns.heatmap(results, annot=True, cmap='Blues', fmt='.2f', xticklabels=operation_names[:-1], yticklabels=operation_names[:-1]).set_title("Overlap score")
+        hm=sns.heatmap(results, annot=True, cmap='Blues', fmt='.0f', xticklabels=operation_names[:-1], yticklabels=operation_names[:-1]).set_title("Overlap score")
         figure = hm.get_figure()
         figure.savefig('figures/heatmap_overlap.png', dpi=400)
         figure.clf()           

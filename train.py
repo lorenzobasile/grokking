@@ -5,7 +5,7 @@ from itertools import permutations
 import operations
 
 from svcca.cca_core import get_cca_similarity
-from similarity import svd_reduction
+#from similarity import svd_reduction
 
 from sklearn import linear_model
 from sklearn.metrics import r2_score
@@ -22,15 +22,22 @@ from models import Decoder
 
 def main(args):
     #torch.manual_seed(0)
+    # tokens for <op> and <=>. It's not clear why <=> is needed at all since it
+    # has no effect on the output, but we'll leave it in to best follow the
+    # paper.
+    eq_token = args.p
+    op_token = args.p + 1
+
     ops={**operations.monomial, **operations.composite, **operations.other}
     score={}
     representations={}
     other_data={}
-    '''
+    
     for key, value in ops.items():
         score[key]=[]
-        representations[key]=torch.load(f'representations/{key}/final.pt')
-    '''
+        other_data[key]=operations.generate_data(args.p, eq_token, op_token, value)
+        #representations[key]=torch.load(f'representations/{key}/final.pt')
+    
     if not os.path.exists(f'weights/{args.operation}'):
         os.makedirs(f'weights/{args.operation}')
     if not os.path.exists(f'figures/{args.operation}'):
@@ -40,12 +47,7 @@ def main(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # tokens for <op> and <=>. It's not clear why <=> is needed at all since it
-    # has no effect on the output, but we'll leave it in to best follow the
-    # paper.
-    eq_token = args.p
-    op_token = args.p + 1
-
+    
     # "We trained a standard decoder-only transformer (Vaswani et al., 2017)
     # with causal attention masking, and calculated loss and accuracy only on
     # the answer part of the equation. For all experiments we used a
@@ -57,8 +59,6 @@ def main(args):
     # "We train on the binary operation of division mod 97 with 50% of the data
     # in the training set."
     alldata = operations.generate_data(args.p, eq_token, op_token, ops[args.operation])
-    for key, value in ops.items():
-        other_data[key]=operations.generate_data(args.p, eq_token, op_token, value)
     train_idx, valid_idx = torch.randperm(alldata.shape[1]).split((alldata.shape[1] // 2)+1)
     train_data, valid_data = alldata[:, train_idx], alldata[:, valid_idx]
 
@@ -135,8 +135,9 @@ def main(args):
                         #svcca_results = get_cca_similarity(x, y, epsilon=1e-10, verbose=False)
                         #score[key].append(svcca_results['cca_coef1'].mean())
 
-                        y=model(other_data[key].to(device)[:-1])[-1].argmax(-1)
-                        score[key].append(torch.sum(torch.eq(x, y))/(args.p**2))
+                        y=other_data[key].to(device)[-1]
+                        result=torch.sum(torch.eq(x, y)).cpu().numpy()
+                        score[key].append(result/(args.p**2))
 
 
         if (e + 1) % 100 == 0:
@@ -170,6 +171,7 @@ def main(args):
             plt.xlabel("Optimization Steps")
             plt.ylabel("score")
             plt.xscale("log", base=10)
+            plt.yscale("log", base=10)
             plt.savefig(f'figures/{args.operation}/overlap_score.png', dpi=150)
             plt.close()
 
