@@ -32,12 +32,12 @@ def main(args):
     score={}
     representations={}
     other_data={}
-    
+
     for key, value in ops.items():
         score[key]=[]
         other_data[key]=operations.generate_data(args.p, eq_token, op_token, value)
         #representations[key]=torch.load(f'representations/{key}/final.pt')
-    
+
     if not os.path.exists(f'weights/{args.operation}'):
         os.makedirs(f'weights/{args.operation}')
     if not os.path.exists(f'figures/{args.operation}'):
@@ -47,13 +47,13 @@ def main(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    
+
     # "We trained a standard decoder-only transformer (Vaswani et al., 2017)
     # with causal attention masking, and calculated loss and accuracy only on
     # the answer part of the equation. For all experiments we used a
     # transformer with 2 layers, width 128, and 4 attention heads"
     model = Decoder(
-        dim=128, num_layers=2, num_heads=4, num_tokens=args.p + 2, seq_len=5
+        dim=256, num_layers=2, num_heads=4, num_tokens=args.p + 2, seq_len=5
     ).to(device)
 
     # "We train on the binary operation of division mod 97 with 50% of the data
@@ -109,7 +109,7 @@ def main(args):
                 if is_train:
                     model.zero_grad()
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
+                    #torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
                     norm=0
                     for p in model.parameters():
                         param_norm = p.grad.detach().data.norm(2)
@@ -158,7 +158,7 @@ def main(args):
             plt.xlabel("Optimization Steps")
             plt.ylabel("Accuracy")
             plt.xscale("log", base=10)
-            plt.savefig(f'figures/{args.operation}/acc.png', dpi=150)
+            plt.savefig(f'figures/{args.operation}/acc256.png', dpi=150)
             plt.close()
 
             plt.plot(steps, grad_norms)
@@ -166,7 +166,7 @@ def main(args):
             plt.xlabel("Optimization Steps")
             plt.ylabel("Grad norm")
             plt.xscale("log", base=10)
-            plt.savefig(f'figures/{args.operation}/norm.png', dpi=150)
+            plt.savefig(f'figures/{args.operation}/norm256.png', dpi=150)
             plt.close()
 
             plt.plot(steps, train_loss, label="train")
@@ -177,7 +177,7 @@ def main(args):
             plt.ylabel("Loss")
             plt.xscale("log", base=10)
             plt.yscale("log", base=10)
-            plt.savefig(f'figures/{args.operation}/loss.png', dpi=150)
+            plt.savefig(f'figures/{args.operation}/loss256.png', dpi=150)
             plt.close()
 
             plt.figure()
@@ -189,7 +189,7 @@ def main(args):
             plt.ylabel("score")
             plt.xscale("log", base=10)
             plt.yscale("log", base=10)
-            plt.savefig(f'figures/{args.operation}/overlap_score.png', dpi=150)
+            plt.savefig(f'figures/{args.operation}/overlap_score256.png', dpi=150)
             plt.close()
 
 
@@ -197,13 +197,13 @@ def main(args):
 
 
         if (e+1)*steps_per_epoch > 10**exp:
-            torch.save(model.state_dict(), f'weights/{args.operation}/weights{10**exp}.pt')
+            torch.save(model.state_dict(), f'weights/{args.operation}/weights{10**exp}256.pt')
             exp+=1
             repr=model.extract_representation(alldata.to(device)[:-1])[-1]
-            torch.save(repr, f'representations/{args.operation}/{10**exp}.pt')
-    torch.save(model.state_dict(), f'weights/{args.operation}/final.pt')
+            torch.save(repr, f'representations/{args.operation}/{10**exp}256.pt')
+    torch.save(model.state_dict(), f'weights/{args.operation}/final256.pt')
     repr=model.extract_representation(alldata.to(device)[:-1])[-1]
-    torch.save(repr, f'representations/{args.operation}/final.pt')
+    torch.save(repr, f'representations/{args.operation}/final256.pt')
 
 
 if __name__ == "__main__":
