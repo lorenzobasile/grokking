@@ -81,7 +81,7 @@ def main(args):
 
     steps_per_epoch = math.ceil(train_data.shape[1] / args.batch_size)
 
-    train_acc, val_acc, train_loss, val_loss = [], [], [], []
+    train_acc, val_acc, train_loss, val_loss, grad_norms = [], [], [], [], []
     exp=0
     for e in tqdm(range(int(args.budget) // steps_per_epoch)):
 
@@ -93,6 +93,7 @@ def main(args):
             model.train(is_train)
             total_loss = 0
             total_acc = 0
+            total_norm = 0
 
             # torch.split faster than dataloader with tensor
             dl = torch.split(data, args.batch_size, dim=1)
@@ -108,6 +109,13 @@ def main(args):
                 if is_train:
                     model.zero_grad()
                     loss.backward()
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
+                    norm=0
+                    for p in model.parameters():
+                        param_norm = p.grad.detach().data.norm(2)
+                        norm += param_norm.item() ** 2
+                    norm = norm ** 0.5
+                    total_norm+=norm
                     optimizer.step()
                     scheduler.step()
 
@@ -117,6 +125,7 @@ def main(args):
 
             if is_train:
                 #print("Train ", total_acc)
+                grad_norms.append(total_norm / train_data.shape[-1])
                 train_acc.append(total_acc / train_data.shape[-1])
                 train_loss.append(total_loss / train_data.shape[-1])
             else:
@@ -150,6 +159,14 @@ def main(args):
             plt.ylabel("Accuracy")
             plt.xscale("log", base=10)
             plt.savefig(f'figures/{args.operation}/acc.png', dpi=150)
+            plt.close()
+
+            plt.plot(steps, grad_norms)
+            plt.title(f'{args.operation}(training on 50% of data)')
+            plt.xlabel("Optimization Steps")
+            plt.ylabel("Grad norm")
+            plt.xscale("log", base=10)
+            plt.savefig(f'figures/{args.operation}/norm.png', dpi=150)
             plt.close()
 
             plt.plot(steps, train_loss, label="train")
