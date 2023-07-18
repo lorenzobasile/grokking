@@ -1,14 +1,7 @@
 import math
 from argparse import ArgumentParser
-from itertools import permutations
 
 import operations
-
-from svcca.cca_core import get_cca_similarity
-#from similarity import svd_reduction
-
-from sklearn import linear_model
-from sklearn.metrics import r2_score
 
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -21,31 +14,23 @@ from models import Decoder
 
 
 def main(args):
-    #torch.manual_seed(0)
+    torch.manual_seed(0)
     # tokens for <op> and <=>. It's not clear why <=> is needed at all since it
     # has no effect on the output, but we'll leave it in to best follow the
     # paper.
-    eq_token = args.p
-    op_token = args.p + 1
 
-    ops={**operations.monomial, **operations.composite, **operations.other}
-    score={}
-    representations={}
-    other_data={}
+    run_name=args.run_name
 
-    for key, value in ops.items():
-        score[key]=[]
-        other_data[key]=operations.generate_data(args.p, eq_token, op_token, value)
-        #representations[key]=torch.load(f'representations/{key}/final.pt')
+    alldata=operations.generate_data(args.p, operations.composite[args.operation]).T
 
-    if not os.path.exists(f'weights/{args.operation}'):
-        os.makedirs(f'weights/{args.operation}')
-    if not os.path.exists(f'figures/{args.operation}'):
-        os.makedirs(f'figures/{args.operation}')
-    if not os.path.exists(f'representations/{args.operation}'):
-        os.makedirs(f'representations/{args.operation}')
+    if not os.path.exists(f'weights/{args.operation}/{run_name}'):
+        os.makedirs(f'weights/{args.operation}/{run_name}')
+    if not os.path.exists(f'figures/{args.operation}/{run_name}'):
+        os.makedirs(f'figures/{args.operation}/{run_name}')
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    factor=('factor' in run_name)
 
 
     # "We trained a standard decoder-only transformer (Vaswani et al., 2017)
@@ -53,14 +38,14 @@ def main(args):
     # the answer part of the equation. For all experiments we used a
     # transformer with 2 layers, width 128, and 4 attention heads"
     model = Decoder(
-        dim=256, num_layers=2, num_heads=4, num_tokens=args.p + 2, seq_len=5
+        dim=128, num_layers=args.layers, num_heads=args.heads, num_tokens=args.p + 2, drop_p=args.drop_p, factor=factor
     ).to(device)
 
     # "We train on the binary operation of division mod 97 with 50% of the data
     # in the training set."
-    alldata = operations.generate_data(args.p, eq_token, op_token, ops[args.operation])
-    train_idx, valid_idx = torch.randperm(alldata.shape[1]).split((alldata.shape[1] // 2)+1)
-    train_data, valid_data = alldata[:, train_idx], alldata[:, valid_idx]
+    
+    train_idx, valid_idx = torch.randperm(len(alldata)).split((len(alldata) // 2)+1)
+    train_data_unshuffled, valid_data = alldata[train_idx], alldata[valid_idx]
 
     # For most experiments we used AdamW optimizer with learning rate 10−3,
     # weight decay 1, β1 = 0.9, β2 = 0.98
@@ -71,139 +56,84 @@ def main(args):
         weight_decay=args.weight_decay,
         betas=(args.beta1, args.beta2),
     )
-    '''
-    optimizer=torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
-    '''
+    
     #  linear learning rate warmup over the first 10 updates
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer, lambda update: 1 if update > 10 else update / 10
     )
 
-    steps_per_epoch = math.ceil(train_data.shape[1] / args.batch_size)
+    steps_per_epoch = math.ceil(train_data_unshuffled.shape[0] / args.batch_size)
 
-    train_acc, val_acc, train_loss, val_loss, grad_norms = [], [], [], [], []
-    exp=0
+    train_acc, val_acc, train_loss, val_loss= [], [], [], []
     for e in tqdm(range(int(args.budget) // steps_per_epoch)):
 
         # randomly shuffle train data
-        train_data = train_data[:, torch.randperm(train_data.shape[1])]
+        train_data = train_data_unshuffled[torch.randperm(train_data_unshuffled.shape[0])]
 
         for data, is_train in [(valid_data, False), (train_data, True)]:
 
             model.train(is_train)
             total_loss = 0
             total_acc = 0
-            total_norm = 0
 
             # torch.split faster than dataloader with tensor
-            dl = torch.split(data, args.batch_size, dim=1)
+            dl = torch.split(data, args.batch_size, dim=0)
             for input in dl:
                 input = input.to(device)
 
                 with torch.set_grad_enabled(is_train):
-                    logits = model(input[:-1])
-                    # calculate loss only on the answer part of the equation (last element
-                    loss = F.cross_entropy(logits[-1], input[-1])
-                    total_loss += loss.item() * input.shape[-1]
+                    logits = model(input[:,:-1])[:,-1]
+                    # calculate loss only on the answer part of the equation (last element)
+                    loss = F.cross_entropy(logits, input[:,-1])
+                    total_loss += loss.item() * len(input)
 
                 if is_train:
                     model.zero_grad()
                     loss.backward()
-                    #torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
-                    norm=0
-                    for p in model.parameters():
-                        param_norm = p.grad.detach().data.norm(2)
-                        norm += param_norm.item() ** 2
-                    norm = norm ** 0.5
-                    total_norm+=norm
                     optimizer.step()
                     scheduler.step()
 
-                acc = (logits[-1].argmax(-1) == input[-1]).float().mean()
+                acc = (logits.argmax(-1) == input[:,-1]).float().mean()
 
-                total_acc += acc.item() * input.shape[-1]
+                total_acc += acc.item() * len(input)
 
             if is_train:
                 #print("Train ", total_acc)
-                grad_norms.append(total_norm / train_data.shape[-1])
-                train_acc.append(total_acc / train_data.shape[-1])
-                train_loss.append(total_loss / train_data.shape[-1])
+                train_acc.append(total_acc / len(train_data))
+                train_loss.append(total_loss / len(train_data))
             else:
                 #print("Test ", total_acc)
-                val_acc.append(total_acc / valid_data.shape[-1])
-                val_loss.append(total_loss / valid_data.shape[-1])
-
-                with torch.no_grad():
-                    x=model(alldata.to(device)[:-1])[-1].argmax(-1)
-                    for key, value in ops.items():
-
-                        #x=representations[key].cpu().numpy()
-                        #y=model.extract_representation(alldata.to(device)[:-1])[-1].cpu().numpy()
-                        #x=svd_reduction(x).T
-                        #y=svd_reduction(y).T
-                        #svcca_results = get_cca_similarity(x, y, epsilon=1e-10, verbose=False)
-                        #score[key].append(svcca_results['cca_coef1'].mean())
-
-                        y=other_data[key].to(device)[-1]
-                        result=torch.sum(torch.eq(x, y)).cpu().numpy()
-                        score[key].append(result/(args.p**2))
+                val_acc.append(total_acc / len(valid_data))
+                val_loss.append(total_loss / len(valid_data))
 
 
-        if (e + 1) % 100 == 0:
+
+        if (len(train_acc)*steps_per_epoch) % 1000 == 0:
             steps = torch.arange(len(train_acc)).numpy() * steps_per_epoch
-            plt.plot(steps, train_acc, label="train")
-            plt.plot(steps, val_acc, label="val")
-            plt.legend()
-            plt.title(f'{args.operation}(training on 50% of data)')
-            plt.xlabel("Optimization Steps")
-            plt.ylabel("Accuracy")
-            plt.xscale("log", base=10)
-            plt.savefig(f'figures/{args.operation}/acc256.png', dpi=150)
-            plt.close()
+            torch.save(model.state_dict(), f'weights/{args.operation}/{run_name}/{steps[-1].item()+steps_per_epoch}.pt')    
+            if (len(train_acc)*steps_per_epoch) % 1000 == 0:  
+                plt.plot(steps, train_acc, label="train")
+                plt.plot(steps, val_acc, label="val")
+                plt.legend()
+                plt.title(f'{args.operation}(training on 50% of data)')
+                plt.xlabel("Optimization Steps")
+                plt.ylabel("Accuracy")
+                plt.xscale("log", base=10)
+                plt.savefig(f'figures/{args.operation}/{run_name}/acc.png', dpi=150)
+                plt.close()
 
-            plt.plot(steps, grad_norms)
-            plt.title(f'{args.operation}(training on 50% of data)')
-            plt.xlabel("Optimization Steps")
-            plt.ylabel("Grad norm")
-            plt.xscale("log", base=10)
-            plt.savefig(f'figures/{args.operation}/norm256.png', dpi=150)
-            plt.close()
+                plt.plot(steps, train_loss, label="train")
+                plt.plot(steps, val_loss, label="val")
+                plt.legend()
+                plt.title(f'{args.operation}(training on 50% of data)')
+                plt.xlabel("Optimization Steps")
+                plt.ylabel("Loss")
+                plt.xscale("log", base=10)
+                plt.yscale("log", base=10)
+                plt.savefig(f'figures/{args.operation}/{run_name}/loss.png', dpi=150)
+                plt.close()
 
-            plt.plot(steps, train_loss, label="train")
-            plt.plot(steps, val_loss, label="val")
-            plt.legend()
-            plt.title(f'{args.operation}(training on 50% of data)')
-            plt.xlabel("Optimization Steps")
-            plt.ylabel("Loss")
-            plt.xscale("log", base=10)
-            plt.yscale("log", base=10)
-            plt.savefig(f'figures/{args.operation}/loss256.png', dpi=150)
-            plt.close()
-
-            plt.figure()
-            for key, value in ops.items():
-                plt.plot(steps, score[key], label=key)
-            plt.legend()
-            plt.title(f'Overlap score')
-            plt.xlabel("Optimization Steps")
-            plt.ylabel("score")
-            plt.xscale("log", base=10)
-            plt.yscale("log", base=10)
-            plt.savefig(f'figures/{args.operation}/overlap_score256.png', dpi=150)
-            plt.close()
-
-
-
-
-
-        if (e+1)*steps_per_epoch > 10**exp:
-            torch.save(model.state_dict(), f'weights/{args.operation}/weights{10**exp}256.pt')
-            exp+=1
-            repr=model.extract_representation(alldata.to(device)[:-1])[-1]
-            torch.save(repr, f'representations/{args.operation}/{10**exp}256.pt')
-    torch.save(model.state_dict(), f'weights/{args.operation}/final256.pt')
-    repr=model.extract_representation(alldata.to(device)[:-1])[-1]
-    torch.save(repr, f'representations/{args.operation}/final256.pt')
+            
 
 
 if __name__ == "__main__":
@@ -217,5 +147,11 @@ if __name__ == "__main__":
     parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--optimizer", default="Adam")
     parser.add_argument("--operation", default="xy")
+    parser.add_argument("--run_name", default="default")
+    parser.add_argument("--drop_p", type=float, default=0.0)
+    parser.add_argument("--layers", type=int, default=2)
+    parser.add_argument("--heads", type=int, default=4)
+
+    
     args = parser.parse_args()
     main(args)

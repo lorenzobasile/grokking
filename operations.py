@@ -1,50 +1,32 @@
 import torch
 
-def multiplication(x,y):
+def multiplication(x,y,p):
     return x*y
-def addition(x,y):
+def addition(x,y,p):
     return x+y
-def division(x,y):
-    return x//y
-def difference(x,y):
+def division(x,y,p):
+    return (x * pow(y, p-2, p))
+def difference(x,y,p):
     return x-y
 
-def x1(x,y):
-    return x
-def y1(x,y):
-    return y
-def x2(x,y):
-    return x*x
-def y2(x,y):
-    return y*y
-def x3(x,y):
-    return x*x*x
-def y3(x,y):
-    return y*y*y
+composite={"xy": multiplication, "x+y": addition, "div": division}
 
-def x2y(x,y):
-    return x*x*y
-def xy2(x,y):
-    return x*y*y
-
-
-
-other={"x^2y":x2y, "xy^2": xy2, "rand":"rand"}
-monomial={"x":x1,"y":y1,"x^2": x2, "y^2": y2, "x^3": x3, "y^3": y3}
-composite={"xy": multiplication, "x+y": addition}
-
-def generate_data(p, eq_token, op_token, operation):
+def generate_data(p, operation):
     x = torch.arange(p)
     y = torch.arange(p)
     x, y = torch.cartesian_prod(x, y).T
 
-    eq = torch.ones_like(x) * eq_token
-    op = torch.ones_like(x) * op_token
+    eq = torch.ones_like(x) * p
+    op = torch.ones_like(x) * (p+1)
     print(x.shape)
     if operation=="rand":
         result=torch.randint(0, p, size=(p*p,))
+    elif operation==division:
+        result=torch.empty_like(x)
+        for i,row in enumerate(zip(x,y)):     
+            result[i]=division(row[0].item(), row[1].item(), p)%p
     else:
-        result = operation(x,y) % p
+        result = operation(x,y,p) % p
 
     # "All of our experiments used a small transformer trained on datasets of
     # equations of the form a◦b = c, where each of “a”, “◦”, “b”, “=”, and “c”
