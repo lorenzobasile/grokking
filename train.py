@@ -9,8 +9,24 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import os
+import numpy as np
 
 from models import Decoder
+
+def running_mean(array, window):
+    if window==1:
+        return array
+    N=window
+    #if len(array)<=window:
+    #return array
+    y_padded = np.pad(array, (N//2, N-1-N//2), mode='edge')
+    y_smooth = np.convolve(y_padded, np.ones((N,))/N, mode='valid') 
+    return y_smooth
+def sparsity(n_data, n_heads, l0_norm, head_dim):
+    low=n_data*n_heads*head_dim
+    up=n_data*n_heads*np.cumsum(np.arange(1,head_dim+1))[-1]
+    sparsity=1-(l0_norm-low)/(up-low)
+    return sparsity
 
 
 def main(args):
@@ -64,6 +80,8 @@ def main(args):
 
     steps_per_epoch = math.ceil(train_data_unshuffled.shape[0] / args.batch_size)
 
+    l0_norm=[[] for i in range(args.layers)]
+
     train_acc, val_acc, train_loss, val_loss= [], [], [], []
     for e in tqdm(range(int(args.budget) // steps_per_epoch)):
 
@@ -98,13 +116,35 @@ def main(args):
                 total_acc += acc.item() * len(input)
 
             if is_train:
-                #print("Train ", total_acc)
                 train_acc.append(total_acc / len(train_data))
                 train_loss.append(total_loss / len(train_data))
             else:
-                #print("Test ", total_acc)
                 val_acc.append(total_acc / len(valid_data))
                 val_loss.append(total_loss / len(valid_data))
+            
+                _, all_repr, all_att=model.extract_representation(alldata.to(device)[:,:-1])
+    
+                for i, layer_att in enumerate(all_att):
+                    
+                    #if i==len(all_att)-1:
+                    '''   
+                    rep=all_repr[i].detach().cpu().numpy()[:,-1]
+                    data = Data(rep, maxk=3)
+                    d=data.compute_id_2NN()[0]
+                    id[i].append(d)
+                    
+                    att_tensor=torch.stack(all_att)
+                    rep=att_tensor.permute(1,0,2,3,4).detach().cpu().numpy().reshape(9409,-1)
+                    data = Data(rep, maxk=3)
+                    d=data.compute_id_2NN()[0]
+                    id_att.append(d)
+                    '''
+                        
+                        
+
+                    #else:
+                    #    pass
+                    l0_norm[i].append(torch.sum(layer_att>1e-3).item())
 
 
 
@@ -133,13 +173,24 @@ def main(args):
                 plt.savefig(f'figures/{args.operation}/{run_name}/loss.png', dpi=150)
                 plt.close()
 
+                for l in range(args.layers):
+                    plt.plot(steps, running_mean(sparsity(len(alldata), args.heads, np.array(l0_norm[l]), 4), 1), label=f'layer {l}')
+                plt.plot(steps, train_acc, label="train acc")
+                plt.plot(steps, val_acc, label="val acc")
+                plt.legend()
+                plt.title(f'{args.operation}(training on 50% of data)')
+                plt.xlabel("Optimization Steps")
+                plt.xscale("log", base=10)
+                plt.savefig(f'figures/{args.operation}/{run_name}/joint.png', dpi=150)
+                plt.close()
+
             
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--p", type=int, default=97)
-    parser.add_argument("--budget", type=int, default=5e5)
+    parser.add_argument("--budget", type=int, default=1e6)
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--beta1", type=float, default=0.9)

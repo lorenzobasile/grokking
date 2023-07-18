@@ -34,7 +34,7 @@ class Block(nn.Module):
         attn_mask = torch.triu(attn_mask, diagonal=1)
         emb = self.ln_emb(emb) if self.ln_emb is not None else x
         x = self.ln_1(x)
-        a, att = self.attn(emb, emb, x, attn_mask=attn_mask, need_weights=True)
+        a, att = self.attn(emb, emb, x, attn_mask=attn_mask, need_weights=True, average_attn_weights=False)
         x = x + a
         m = self.mlp(self.ln_2(x))
         x = x + m
@@ -64,7 +64,6 @@ class Decoder(nn.Module):
         rep=[]
         h = self.token_embeddings(x)
         positions = torch.arange(x.shape[1], device=x.device)
-        #h = h + 
         emb=self.position_embeddings(positions).expand_as(h)
         h = h if self.factor else h+emb
         for layer in self.layers:

@@ -14,6 +14,8 @@ composite={"xy": multiplication, "x+y": addition, "div": division}
 def generate_data(p, operation):
     x = torch.arange(p)
     y = torch.arange(p)
+    if operation==division:
+        y = torch.arange(1,p)
     x, y = torch.cartesian_prod(x, y).T
 
     eq = torch.ones_like(x) * p
